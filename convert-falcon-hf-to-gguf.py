@@ -22,13 +22,11 @@ import gguf
 
 
 def count_model_parts(dir_model: Path, prefix: str) -> int:
-    num_parts = 0
-    for filename in os.listdir(dir_model):
-        if filename.startswith(prefix):
-            num_parts += 1
-
+    num_parts = sum(
+        1 for filename in os.listdir(dir_model) if filename.startswith(prefix)
+    )
     if num_parts > 0:
-        print("gguf: found " + str(num_parts) + " model parts")
+        print(f"gguf: found {str(num_parts)} model parts")
     return num_parts
 
 
@@ -73,7 +71,7 @@ else:
     # output in the same directory as the model by default
     fname_out = dir_model / f'ggml-model-{ftype_str[ftype]}.gguf'
 
-print("gguf: loading model "+dir_model.name)
+print(f"gguf: loading model {dir_model.name}")
 
 with open(dir_model / "config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
@@ -178,7 +176,7 @@ else:
 for part_name in part_names:
     if args.vocab_only:
         break
-    print("gguf: loading model part '" + part_name + "'")
+    print(f"gguf: loading model part '{part_name}'")
     if is_safetensors:
         ctx = safe_open(dir_model / part_name, framework="pt", device="cpu")
     else:
@@ -191,7 +189,7 @@ for part_name in part_names:
             old_dtype = data.dtype
 
             # convert any unsupported data types to float32
-            if data.dtype != torch.float16 and data.dtype != torch.float32:
+            if data.dtype not in [torch.float16, torch.float32]:
                 data = data.to(torch.float32)
 
             # QKV tensor transform
@@ -216,7 +214,7 @@ for part_name in part_names:
             # map tensor names
             new_name = tensor_map.get_name(name, try_suffixes = (".weight", ".bias"))
             if new_name is None:
-                print("Can not map tensor '" + name + "'")
+                print(f"Can not map tensor '{name}'")
                 sys.exit()
 
             n_dims = len(data.shape)
@@ -234,7 +232,7 @@ for part_name in part_names:
             if ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and n_dims == 2:
                 data = data.astype(np.float16)
 
-            print(new_name + ", n_dims = " + str(n_dims) + ", " + str(old_dtype) + " --> " + str(data.dtype))
+            print(f"{new_name}, n_dims = {n_dims}, {str(old_dtype)} --> {str(data.dtype)}")
 
             gguf_writer.add_tensor(new_name, data)
 
