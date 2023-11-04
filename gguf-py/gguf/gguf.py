@@ -549,15 +549,11 @@ class TensorNameMap:
 
     def get_name(self, key: str, try_suffixes: Sequence[str] = ()) -> str | None:
         result = self.get_type_and_name(key, try_suffixes = try_suffixes)
-        if result is None:
-            return None
-        return result[1]
+        return None if result is None else result[1]
 
     def get_type(self, key: str, try_suffixes: Sequence[str] = ()) -> MODEL_TENSOR | None:
         result = self.get_type_and_name(key, try_suffixes = try_suffixes)
-        if result is None:
-            return None
-        return result[0]
+        return None if result is None else result[0]
 
     def __getitem__(self, key: str) -> str:
         try:
@@ -630,7 +626,7 @@ class GGUFValueType(IntEnum):
 
     @staticmethod
     def get_type(val):
-        if isinstance(val, str) or isinstance(val, bytes) or isinstance(val, bytearray):
+        if isinstance(val, (str, bytes, bytearray)):
             return GGUFValueType.STRING
         elif isinstance(val, list):
             return GGUFValueType.ARRAY
@@ -640,9 +636,8 @@ class GGUFValueType(IntEnum):
             return GGUFValueType.BOOL
         elif isinstance(val, int):
             return GGUFValueType.INT32
-        # TODO: need help with 64-bit types in Python
         else:
-            print("Unknown type: "+str(type(val)))
+            print(f"Unknown type: {str(type(val))}")
             sys.exit()
 
 
@@ -661,10 +656,7 @@ class GGUFWriter:
 
     @property
     def pack_prefix(self):
-        if self.endianess==GGUFEndian.LITTLE:
-            return "<"
-        else:
-            return ">"
+        return "<" if self.endianess==GGUFEndian.LITTLE else ">"
 
     def __init__(self, path: os.PathLike[str] | str, arch: str, use_temp_file = True, endianess=GGUFEndian.LITTLE):
         self.fout = open(path, "wb")
@@ -753,7 +745,7 @@ class GGUFWriter:
         self.add_val(val, GGUFValueType.BOOL)
 
     def add_string(self, key: str, val: str):
-        if len(val) == 0:
+        if not val:
             return
         self.add_key(key)
         self.add_val(val, GGUFValueType.STRING)
@@ -782,7 +774,7 @@ class GGUFWriter:
             self.kv_data += encoded_val
         elif vtype == GGUFValueType.ARRAY and isinstance(val, Sequence) and len(val) > 0:
             ltype = GGUFValueType.get_type(val[0])
-            if not all(GGUFValueType.get_type(i) is ltype for i in val[1:]):
+            if any(GGUFValueType.get_type(i) is not ltype for i in val[1:]):
                 raise ValueError("All items in a GGUF array should be of the same type")
             self.kv_data += struct.pack(f"{self.pack_prefix}I", ltype)
             self.kv_data += struct.pack(f"{self.pack_prefix}Q", len(val))

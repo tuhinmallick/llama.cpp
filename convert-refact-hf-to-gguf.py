@@ -18,13 +18,13 @@ if "NO_LOCAL_GGUF" not in os.environ:
 import gguf
 
 def count_model_parts(dir_model: Path) -> int:
-    num_parts = 0
-    for filename in os.listdir(dir_model):
-        if filename.startswith("pytorch_model-"):
-            num_parts += 1
-
+    num_parts = sum(
+        1
+        for filename in os.listdir(dir_model)
+        if filename.startswith("pytorch_model-")
+    )
     if num_parts > 0:
-        print("gguf: found " + str(num_parts) + " model parts")
+        print(f"gguf: found {str(num_parts)} model parts")
     return num_parts
 
 
@@ -60,8 +60,8 @@ def parse_args() -> argparse.Namespace:
 
 args = parse_args()
 
-dir_model = args.model
 ftype = args.ftype
+dir_model = args.model
 if not dir_model.is_dir():
     print(f"Error: {args.model} is not a directory", file=sys.stderr)
     sys.exit(1)
@@ -79,7 +79,7 @@ else:
     # output in the same directory as the model by default
     fname_out = dir_model / f"ggml-model-{ftype_str[ftype]}.gguf"
 
-print("gguf: loading model " + dir_model.name)
+print(f"gguf: loading model {dir_model.name}")
 
 with open(dir_model / "config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
@@ -184,7 +184,7 @@ else:
 for part_name in part_names:
     if args.vocab_only:
         break
-    print("gguf: loading model part '" + part_name + "'")
+    print(f"gguf: loading model part '{part_name}'")
     model_part = torch.load(dir_model / part_name, map_location="cpu")
 
     for i in range(block_count):
@@ -214,7 +214,7 @@ for part_name in part_names:
         old_dtype = data.dtype
 
         # convert any unsupported data types to float32
-        if data.dtype != torch.float16 and data.dtype != torch.float32:
+        if data.dtype not in [torch.float16, torch.float32]:
             data = data.to(torch.float32)
 
         data = data.squeeze().numpy()
@@ -222,7 +222,7 @@ for part_name in part_names:
         # map tensor names
         new_name = tensor_map.get_name(name, try_suffixes=(".weight",))
         if new_name is None:
-            print("Can not map tensor '" + name + "'")
+            print(f"Can not map tensor '{name}'")
             sys.exit()
 
         n_dims = len(data.shape)
@@ -245,15 +245,7 @@ for part_name in part_names:
         ):
             data = data.astype(np.float16)
 
-        print(
-            new_name
-            + ", n_dims = "
-            + str(n_dims)
-            + ", "
-            + str(old_dtype)
-            + " --> "
-            + str(data.dtype)
-        )
+        print(f"{new_name}, n_dims = {n_dims}, {str(old_dtype)} --> {str(data.dtype)}")
 
         gguf_writer.add_tensor(new_name, data)
 
